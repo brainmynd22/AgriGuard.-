@@ -4,6 +4,7 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 import os
+import gdown
 
 st.set_page_config(page_title="AgriGuard - Plant Disease Surveillance", page_icon="🌱", layout="wide")
 
@@ -20,6 +21,9 @@ CROP_CLASSES = {
     "Maize": ['Maize fall armyworm', 'Maize grasshoper', 'Maize healthy', 'Maize leaf beetle', 'Maize leaf blight', 'Maize leaf spot']
 }
 
+# GOOGLE DRIVE FOLDER LINK
+FOLDER_URL = "https://drive.google.com/drive/folders/1-eQVUlZ2q4XLQeL0ZwUz3fMzx1X6lY95"
+
 MODEL_PATHS = {
     "Cassava": "saved_models/cassava_resnet50.pth",
     "Maize": "saved_models/maize_resnet50.pth"
@@ -33,6 +37,13 @@ transform = transforms.Compose([
 
 @st.cache_resource
 def load_model(crop_name):
+    weights_path = MODEL_PATHS[crop_name]
+    
+    # Download entire models folder if saved_models folder doesn't exist locally
+    if not os.path.exists("saved_models"):
+        st.info("Downloading model weights from Google Drive...")
+        gdown.download_folder(url=FOLDER_URL, output="saved_models", quiet=False)
+
     num_classes = len(CROP_CLASSES[crop_name])
     model = models.resnet50(weights=None)
     in_features = model.fc.in_features
@@ -41,13 +52,12 @@ def load_model(crop_name):
         nn.Linear(in_features, num_classes)
     )
     
-    weights_path = MODEL_PATHS[crop_name]
     if os.path.exists(weights_path):
         model.load_state_dict(torch.load(weights_path, map_location=torch.device('cpu')))
         model.eval()
         return model
     else:
-        st.error(f"Model file not found at {weights_path}. Please upload weights to saved_models/ folder.")
+        st.error(f"Could not find weights file at {weights_path}.")
         return None
 
 uploaded_file = st.file_uploader(f"Choose a {selected_crop} leaf image...", type=["jpg", "jpeg", "png"])
@@ -71,4 +81,3 @@ if uploaded_file is not None:
         
         st.success(f"**Diagnosis:** {detected}")
         st.info(f"**Confidence Score:** {score:.2f}%")
-
